@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="240" height="200" role="img" aria-label="Radius Finance pin logo">
+  <defs>
+    <linearGradient id="pinGrad" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%" stop-color="#b23a35"/>
+      <stop offset="100%" stop-color="#8c2822"/>
+    </linearGradient>
+  </defs>
+  <g fill="none" fill-rule="evenodd">
+    <path d="M60 6c15 0 28 12.6 28 28.1 0 19.6-28 62.9-28 62.9S32 53.7 32 34.1C32 18.6 45 6 60 6z" fill="url(#pinGrad)"/>
+    <circle cx="60" cy="34" r="16" fill="#fff"/>
+    <text x="60" y="40" font-family="Roboto, Inter, Arial, sans-serif" font-size="22" text-anchor="middle" fill="#8c2822" font-weight="700">$</text>
+  </g>
+</svg>

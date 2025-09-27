@@ -1,0 +1,46 @@
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Radius Finance — Welcome</title>
+  <!-- Roboto font for the project -->
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="welcome-page">
+  <main class="hero">
+    <div class="hero-card phone-centered">
+      <img src="assets/logo.svg" alt="Radius Finance logo" class="logo pin" />
+      <h1 class="hero-title">Radius Finance</h1>
+      <div class="hero-actions">
+        <button id="get-started" class="btn btn-primary start-large" aria-label="Start Radius Finance">Start!</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- Hidden login section that Get Started will reveal. Implemented so we can prototype the flow. -->
+  <section id="login" class="login hidden" aria-hidden="true">
+    <div class="login-card">
+      <h1 class="login-heading">Welcome to Radius Finance!</h1>
+      <p class="login-instruction">Please enter the following fields</p>
+
+      <form id="login-form" class="login-grid" aria-label="Radius sign-in form">
+        <div class="label-col">
+          <div class="field-label">Account Name:</div>
+          <div class="field-label">Password:</div>
+          <div class="field-label">Account ID:</div>
+        </div>
+        <div class="input-col">
+          <input id="account" name="account" placeholder="Enter Account Name" autocomplete="username" />
+          <input id="password" name="password" type="password" placeholder="Enter Password" autocomplete="current-password" />
+          <input id="account-id" name="account-id" placeholder="Enter Account ID" />
+        </div>
+
+        <div class="form-actions">
+          <button id="login-btn" class="btn btn-primary login-main" type="button">Login</button>
+        </div>
+      </form>
+    </div>
+  </section>
+  <script src="script.js"></script>
+</body>
+</html>

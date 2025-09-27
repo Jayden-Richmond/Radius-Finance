@@ -1,0 +1,62 @@
+:root{
+  --brand:#b23a35; /* primary brand red matching the logo */
+  --brand-dark:#8c2822;
+}
+
+/* Use Roboto across the app */
+body{font-family:'Roboto', Inter, system-ui, -apple-system, 'Segoe UI', Roboto, Arial;}
+
+/* Ensure the hero-card and its contents are perfectly centered */
+.hero{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:18px}
+.hero-card{background:white;width:360px;max-width:94vw;border-radius:12px;padding:56px 24px;text-align:center;box-shadow:0 10px 36px rgba(11,12,13,0.14);display:flex;flex-direction:column;align-items:center;justify-content:center}
+.logo.pin{width:220px;height:220px;margin:0 auto 18px;display:block}
+.hero-title{font-size:24px;color:var(--brand);margin:10px 0 12px;font-weight:900}
+
+/* Start button: use the same gradient as the logo, stronger shadow, and larger touch target */
+.start-large{background:linear-gradient(180deg,var(--brand) 0%, var(--brand-dark) 100%);color:#ffffff;padding:22px 46px;border-radius:14px;font-size:22px;font-weight:700;border:none;font-family:'Roboto',sans-serif;box-shadow:0 8px 24px rgba(178,58,53,0.18);transition:transform 160ms ease,box-shadow 160ms ease,filter 160ms ease}
+.start-large:hover{transform:translateY(-3px);box-shadow:0 14px 36px rgba(140,40,34,0.22);filter:brightness(1.03)}
+.start-large:active{transform:translateY(1px);box-shadow:0 6px 18px rgba(140,40,34,0.18)}
+
+/* On larger viewports: white should expand to edges but center content */
+@media (min-width:720px){
+  body.welcome-page{background:#f3f3f3}
+  .hero{padding:0}
+  .hero-card{width:100%;max-width:100%;border-radius:0;padding:120px 24px;box-shadow:none}
+  .logo.pin{width:300px;height:300px}
+  .hero-title{font-size:34px}
+  .start-large{padding:24px 56px;font-size:24px}
+}
+
+/* Login screen layout (two-column labels + inputs) */
+.login-card{width:100%;max-width:520px;background:white;padding:36px;border-radius:12px;box-shadow:0 10px 30px rgba(11,12,13,0.08);display:flex;flex-direction:column;align-items:flex-start}
+.login-heading{font-size:24px;margin:0 0 6px;font-weight:900;color:#0b0b0b}
+.login-instruction{margin:0 0 18px;color:#333}
+
+.login-grid{display:grid;grid-template-columns:170px 1fr;gap:12px 18px;align-items:center;width:100%}
+.field-label{color:var(--brand);font-weight:700;font-size:18px;text-align:left}
+.input-col input{width:100%;padding:8px 10px;border-radius:6px;border:1px solid rgba(0,0,0,0.06);background:transparent;color:#444}
+.input-col input::placeholder{color:#999;font-style:italic}
+
+.form-actions{grid-column:1 / -1;display:flex;justify-content:center;margin-top:18px}
+.login-main{background:linear-gradient(180deg,var(--brand) 0%, var(--brand-dark) 100%);color:#fff;padding:16px 46px;border-radius:10px;font-size:20px;font-weight:700;border:none}
+
+/* Make labels non-selectable / non-editable-looking */
+.field-label{user-select:none}
+
+/* Small screens stack into single column with labels above inputs */
+@media (max-width:520px){
+  .login-grid{grid-template-columns:1fr;}
+  .field-label{text-align:left}
+  .form-actions{margin-top:22px}
+}
+
+/* Utility hidden class for JS toggles */
+.hidden{display:none !important}
+
+/* Login overlay — appears above the page when shown */
+.login{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;z-index:1000}
+.login::before{content:"";position:absolute;inset:0;background:rgba(0,0,0,0.55);z-index:1}
+.login-card{position:relative;z-index:2}
+
+/* Prevent background scrolling while modal is open */
+body.modal-open{overflow:hidden}
