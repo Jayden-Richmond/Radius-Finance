@@ -41,6 +41,28 @@
       </form>
     </div>
   </section>
+
+  <!-- Dashboard (hidden until successful login) -->
+  <section id="dashboard" class="dashboard hidden" aria-hidden="true">
+    <div class="dashboard-container">
+      <div class="balance-card">
+        <div class="balance-title">ACCOUNT</div>
+        <div class="balance-amount">$0.00</div>
+      </div>
+
+      <!-- Categories of spending section (buttons + chart placeholder) -->
+      <section class="categories">
+        <h2 class="categories-heading">CATEGORIES OF SPENDING</h2>
+        <div class="cat-buttons">
+          <button class="cat-btn" type="button">Daily</button>
+          <button class="cat-btn" type="button">Weekly</button>
+          <button class="cat-btn" type="button">Monthly</button>
+        </div>
+
+        <!-- Daily chart removed per request -->
+      </section>
+    </div>
+  </section>
   <script src="script.js"></script>
 </body>
 </html>
