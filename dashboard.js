@@ -283,11 +283,17 @@ async function drawChartForUser(userId){
 
     // Aggregate selected types into summed user and state datasets (one line each)
     const datasets = [];
+    // load hidden set so we can apply persisted visibility to datasets
+    const hiddenLabels = loadHiddenDatasetLabels();
     // If no types selected, show flat zero-slope lines for both You and state avg
     if(!selectedTypes || selectedTypes.length === 0){
       const zeros = weeks.map(()=>0);
-      datasets.push({ label: 'You', data: zeros, borderColor: 'rgba(178,58,53,1)', backgroundColor: 'rgba(178,58,53,0.12)', tension:0.3, fill:true });
-  datasets.push({ label: `${state} — state average`, data: zeros, borderColor: 'rgba(80,120,200,1)', backgroundColor: 'rgba(80,120,200,0.12)', tension:0.3, fill:true });
+      const youDs = { label: 'You', data: zeros, borderColor: 'rgba(178,58,53,1)', backgroundColor: 'rgba(178,58,53,0.12)', tension:0.3, fill:true };
+      const stDs = { label: `${state} — state average`, data: zeros, borderColor: 'rgba(80,120,200,1)', backgroundColor: 'rgba(80,120,200,0.12)', tension:0.3, fill:true };
+      if(hiddenLabels.has(youDs.label)) youDs.hidden = true;
+      if(hiddenLabels.has(stDs.label)) stDs.hidden = true;
+      datasets.push(youDs);
+      datasets.push(stDs);
     }else{
       // accumulate per-week sums
       const userMap = new Map();
@@ -312,9 +318,68 @@ async function drawChartForUser(userId){
       }
       const userData = mapUserToWeeks(userMap, weeks);
       const stateAvg = computeStateAverageForWeeks(stateUserWeek, state, weeks);
-      datasets.push({ label: 'You', data: userData, borderColor: 'rgba(178,58,53,1)', backgroundColor: 'rgba(178,58,53,0.12)', tension:0.3, fill:true });
-  datasets.push({ label: `${state} — state average`, data: stateAvg, borderColor: 'rgba(80,120,200,1)', backgroundColor: 'rgba(80,120,200,0.12)', tension:0.3, fill:true });
-    }
+      const youDs = { label: 'You', data: userData, borderColor: 'rgba(178,58,53,1)', backgroundColor: 'rgba(178,58,53,0.12)', tension:0.3, fill:true };
+      const stDs = { label: `${state} — state average`, data: stateAvg, borderColor: 'rgba(80,120,200,1)', backgroundColor: 'rgba(80,120,200,0.12)', tension:0.3, fill:true };
+      if(hiddenLabels.has(youDs.label)) youDs.hidden = true;
+      if(hiddenLabels.has(stDs.label)) stDs.hidden = true;
+      datasets.push(youDs);
+      datasets.push(stDs);
+
+      // Add faint horizontal region-average lines per selected purchase type using filtered_expenditures.csv
+      try{
+        const feText = await fetchText('filtered_expenditures.csv');
+        const feMap = parseFilteredExpenditures(feText);
+        const region = stateToRegion(state);
+        const norm = s => String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'');
+        // aggregate matched weekly means across selected types into a single horizontal line
+        let totalWeekly = 0;
+        let matchedCount = 0;
+        const matchedKeys = [];
+        for(const t of selectedTypes){
+          // find best match in filtered_expenditures
+          const target = norm(t);
+          let matchedKey = null;
+          for(const key of feMap.keys()){
+            const k = norm(key);
+            if(k === target || k.includes(target) || target.includes(k)){
+              matchedKey = key; break;
+            }
+          }
+          if(!matchedKey) continue;
+          const entry = feMap.get(matchedKey);
+          if(!entry) continue;
+          const weeklyVal = Number(entry[region] || entry['United States'] || 0);
+          if(Number.isNaN(weeklyVal)) continue;
+          totalWeekly += weeklyVal;
+          matchedKeys.push(matchedKey);
+          matchedCount++;
+        }
+        if(matchedCount > 0){
+          const roundedTotal = Number(totalWeekly.toFixed(2));
+          // Scale the aggregated regional weekly mean by user's weekly income relative to the region's average weekly income
+          let adjustedTotal = roundedTotal;
+          try{
+            const regionAvgInc = computeRegionAverageWeeklyIncome(rows, region);
+            // Determine user weekly income from dataset (prefer explicit weekly column)
+            const userIncRaw = (firstRow && (firstRow.income_weekly || firstRow.income_yearly)) ? (Number(firstRow.income_weekly) || (Number(firstRow.income_yearly) / 52)) : NaN;
+            const userWeeklyInc = Number(userIncRaw);
+            if(regionAvgInc && Number.isFinite(userWeeklyInc) && userWeeklyInc > 0 && regionAvgInc > 0){
+              const factor = userWeeklyInc / regionAvgInc;
+              adjustedTotal = Number((roundedTotal * factor).toFixed(2));
+            }
+          }catch(e){ /* if anything fails, fall back to unadjusted value */ }
+          // Use a short consistent label as requested
+          const label = 'Average — location & income';
+          const horizData = weeks.map(()=>adjustedTotal);
+          const avgDs = { label: label, data: horizData, borderColor: 'rgba(120,120,120,0.28)', borderDash:[6,6], pointRadius:0, fill:false };
+          if(hiddenLabels.has(avgDs.label)) avgDs.hidden = true;
+          datasets.push(avgDs);
+        }
+      }catch(e){
+        console.warn('filtered_expenditures.csv not available or failed to parse', e);
+      }
+ 
+     }
     console.debug('datasets count:', datasets.length);
     if(datasets.length === 0){
       console.warn('No datasets generated for selected types');
@@ -323,20 +388,70 @@ async function drawChartForUser(userId){
       return;
     }
     status.textContent = '';
-    if(window._dashboardChart) window._dashboardChart.destroy();
+    // Before creating the chart, make sure all dataset labels have consistent hidden properties
+    // (already set when constructing datasets above).
+    // Ensure previous chart is destroyed to avoid Chart.js "canvas is already in use" errors
+    if(window._dashboardChart){
+      try{ window._dashboardChart.destroy(); }catch(e){ /* ignore */ }
+      window._dashboardChart = null;
+    }
     window._dashboardChart = new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: weeks,
-        datasets: datasets
-      },
-      options: { responsive:true, scales: { y: { beginAtZero:true, title: { display:true, text:'Spending (USD)' } }, x: { title: { display:true, text:'Week starting' } } } }
+       type: 'line',
+       data: {
+         labels: weeks,
+         datasets: datasets
+       },
+       options: { responsive:true, scales: { y: { beginAtZero:true, title: { display:true, text:'Spending (USD)' } }, x: { title: { display:true, text:'Week starting' } } } }
     });
+    // Attach legend click handler programmatically so we can persist legend-hidden state
+    try{
+      window._dashboardChart.options.plugins = window._dashboardChart.options.plugins || {};
+      window._dashboardChart.options.plugins.legend = window._dashboardChart.options.plugins.legend || {};
+      window._dashboardChart.options.plugins.legend.onClick = legendToggleHandler;
+      window._dashboardChart.update();
+    }catch(e){ /* ignore if plugin attach fails */ }
 
   }catch(err){
     console.error(err);
     status.textContent = 'Failed to load data: ' + err.message;
   }
+}
+
+// Named handler for legend clicks - toggles visibility and persists label state
+function legendToggleHandler(e, legendItem, legend){
+  try{
+    const index = legendItem.datasetIndex;
+    const ci = legend.chart;
+    // Toggle using chart helper so Chart.js internal state stays consistent
+    if(typeof ci.toggleDataVisibility === 'function'){
+      ci.toggleDataVisibility(index);
+    }else{
+      // fallback for older versions
+      const meta = ci.getDatasetMeta(index);
+      meta.hidden = meta.hidden === null ? !ci.data.datasets[index].hidden : !meta.hidden;
+    }
+    ci.update();
+    // Persist the hidden state by dataset label
+    const label = (ci.data.datasets[index] && ci.data.datasets[index].label) ? ci.data.datasets[index].label : legendItem.text;
+    const set = loadHiddenDatasetLabels();
+    const isNowHidden = !(typeof ci.isDatasetVisible === 'function' ? ci.isDatasetVisible(index) : !(ci.getDatasetMeta(index).hidden));
+    if(isNowHidden) set.add(label); else set.delete(label);
+    saveHiddenDatasetLabels(set);
+  }catch(e){ /* ignore */ }
+}
+
+// Helpers to persist which dataset labels the user has hidden via the legend
+function loadHiddenDatasetLabels(){
+  try{
+    const s = localStorage.getItem('dashboard.hiddenDatasets');
+    if(!s) return new Set();
+    const arr = JSON.parse(s);
+    if(!Array.isArray(arr)) return new Set();
+    return new Set(arr);
+  }catch(e){ return new Set(); }
+}
+function saveHiddenDatasetLabels(set){
+  try{ localStorage.setItem('dashboard.hiddenDatasets', JSON.stringify(Array.from(set))); }catch(e){}
 }
 
 document.addEventListener('DOMContentLoaded', ()=>{
@@ -469,5 +584,64 @@ function getSelectedPurchaseTypes(){
   const container = document.getElementById('purchase-type-select');
   if(!container) return [];
   return Array.from(container.querySelectorAll('input[type=checkbox]:checked')).map(cb => cb.value);
+}
+
+function parseFilteredExpenditures(text){
+  // Expect CSV with header: Item,United States Mean (Weekly $),Northeast Mean (Weekly $),Midwest Mean (Weekly $),South Mean (Weekly $),West Mean (Weekly $)
+  const lines = text.split(/\r?\n/).filter(Boolean);
+  if(lines.length === 0) return new Map();
+  const header = lines.shift().split(',').map(h => h.trim());
+  // find indices
+  const idx = {};
+  header.forEach((h,i) => { idx[h] = i; });
+  const m = new Map();
+  for(const l of lines){
+    const parts = l.split(',');
+    const item = parts[0];
+    if(!item) continue;
+    const entry = {
+      'United States': parseFloat(parts[idx['United States Mean (Weekly $)']] || '0') || 0,
+      'Northeast': parseFloat(parts[idx['Northeast Mean (Weekly $)']] || '0') || 0,
+      'Midwest': parseFloat(parts[idx['Midwest Mean (Weekly $)']] || '0') || 0,
+      'South': parseFloat(parts[idx['South Mean (Weekly $)']] || '0') || 0,
+      'West': parseFloat(parts[idx['West Mean (Weekly $)']] || '0') || 0
+    };
+    m.set(String(item).trim(), entry);
+  }
+  return m;
+}
+
+function stateToRegion(state){
+  if(!state) return 'United States';
+  const s = String(state).trim();
+  const mapping = {
+    'Connecticut':'Northeast','Maine':'Northeast','Massachusetts':'Northeast','New Hampshire':'Northeast','Rhode Island':'Northeast','Vermont':'Northeast','New Jersey':'Northeast','New York':'Northeast','Pennsylvania':'Northeast',
+    'Illinois':'Midwest','Indiana':'Midwest','Michigan':'Midwest','Ohio':'Midwest','Wisconsin':'Midwest','Iowa':'Midwest','Kansas':'Midwest','Minnesota':'Midwest','Missouri':'Midwest','Nebraska':'Midwest','North Dakota':'Midwest','South Dakota':'Midwest',
+    'Delaware':'South','Florida':'South','Georgia':'South','Maryland':'South','North Carolina':'South','South Carolina':'South','Virginia':'South','West Virginia':'South','Alabama':'South','Kentucky':'South','Mississippi':'South','Tennessee':'South','Arkansas':'South','Louisiana':'South','Oklahoma':'South','Texas':'South','District of Columbia':'South',
+    'Arizona':'West','Colorado':'West','Idaho':'West','Montana':'West','Nevada':'West','New Mexico':'West','Utah':'West','Wyoming':'West','Alaska':'West','California':'West','Hawaii':'West','Oregon':'West','Washington':'West'
+  };
+  return mapping[s] || 'United States';
+}
+
+function computeRegionAverageWeeklyIncome(rows, region){
+  const seen = new Set();
+  let sum = 0;
+  let count = 0;
+  for(const r of rows){
+    const id = String(r.id);
+    if(seen.has(id)) continue;
+    seen.add(id);
+    const reg = stateToRegion(r.location);
+    if(reg !== region) continue;
+    let inc = Number(r.income_weekly);
+    if(Number.isNaN(inc) || inc === 0){
+      const y = Number(r.income_yearly);
+      if(!Number.isNaN(y) && y !== 0) inc = y / 52;
+    }
+    if(Number.isNaN(inc) || inc === 0) continue;
+    sum += inc;
+    count++;
+  }
+  return count === 0 ? null : (sum / count);
 }
 
