@@ -60,3 +60,35 @@ body{font-family:'Roboto', Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 
 
 /* Prevent background scrolling while modal is open */
 body.modal-open{overflow:hidden}
+
+/* Dashboard-specific styles */
+.dashboard-page{background:#f7f7f7}
+
+/* Make the page align the account card near the top and center it horizontally */
+.dashboard-page .hero{min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding-top:36px}
+
+/* Remove the white card container so only the account card is visible */
+.dashboard-card{background:transparent;width:100%;max-width:900px;border-radius:0;padding:0;text-align:center;box-shadow:none;display:flex;flex-direction:column;align-items:center}
+
+/* New account card: large branded rounded rectangle with white text */
+.account-card{width:94%;max-width:760px;background:var(--brand);color:#ffffff;border-radius:14px;padding:28px 30px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;box-shadow:0 6px 18px rgba(178,58,53,0.12)}
+.account-title{font-weight:900;font-size:28px;letter-spacing:1px;margin-bottom:8px;color:rgba(255,255,255,0.95)}
+.account-balance{font-weight:900;font-size:56px;line-height:1;margin-top:6px;color:#fff}
+
+/* Remove any leftover margin from hero title/logo area */
+.logo.pin{display:none}
+.hero-title{display:none}
+
+/* Remove action buttons styling entirely (no buttons on this page) */
+.balance-actions{display:none}
+
+/* Responsive adjustments: scale balance font on small/large screens */
+@media (min-width:720px){
+  .dashboard-card{padding-top:48px}
+  .account-card{padding:36px 36px;border-radius:18px}
+  .account-title{font-size:34px}
+  .account-balance{font-size:72px}
+}
+
+/* Small tweak to make logout look secondary */
+.btn{font-family:'Roboto',sans-serif}

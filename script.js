@@ -25,9 +25,23 @@ document.addEventListener('DOMContentLoaded', ()=>{
         alert('Please fill all fields before continuing.');
         return;
       }
-      // Simulate a successful login for the demo
-      alert('Login successful (demo).');
-      // Later: proceed to dashboard or next step
+
+      // Only accept the hardcoded demo credentials for now
+      if(account.value === 'demo' && password.value === 'demo' && accountId.value === '0000'){
+        // mark demo session
+        localStorage.setItem('currentUser', 'demo');
+        // ensure a default balance exists for the demo
+        if(localStorage.getItem('balance') === null){
+          localStorage.setItem('balance', '0.00');
+        }
+        // navigate to dashboard
+        window.location.href = 'dashboard.html';
+        return;
+      }
+
+      // otherwise show an error
+      alert('Invalid credentials. For this demo, use: account: demo, password: demo, id: 0000');
+      return;
     });
   }
 

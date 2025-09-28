@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Radius Finance — Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="dashboard-page">
+  <main class="hero">
+    <div class="dashboard-card">
+      <div class="account-card" role="region" aria-label="Account balance">
+        <div class="account-title">ACCOUNT</div>
+        <div class="account-balance" id="balance-amount">$0.00</div>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', ()=>{
+      const amountEl = document.getElementById('balance-amount');
+
+      function formatMoney(value){
+        const n = Number(value);
+        if(isNaN(n)) return '$0.00';
+        return '$' + n.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+      }
+
+      // Read stored balance or default to 0.00
+      let balance = localStorage.getItem('balance');
+      if(balance === null) balance = '0.00';
+      amountEl.textContent = formatMoney(balance);
+    });
+  </script>
+</body>
+</html>
