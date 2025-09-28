@@ -25,9 +25,20 @@ document.addEventListener('DOMContentLoaded', ()=>{
         alert('Please fill all fields before continuing.');
         return;
       }
-      // Simulate a successful login for the demo
-      alert('Login successful (demo).');
-      // Later: proceed to dashboard or next step
+      // Check demo credentials and reveal dashboard
+      if(account.value === 'demo' && password.value === 'demo' && accountId.value === '0000'){
+        // Close login modal
+        closeModal();
+        // Hide the hero/start screen
+        const hero = document.querySelector('.hero'); if(hero) hero.classList.add('hidden');
+        // Reveal dashboard
+        const dashboard = document.getElementById('dashboard');
+        if(dashboard){ dashboard.classList.remove('hidden'); dashboard.setAttribute('aria-hidden','false'); }
+        // focus on dashboard for screen readers
+        setTimeout(()=>{ const bd = document.getElementById('dashboard'); if(bd) bd.focus(); }, 80);
+      } else {
+        alert('Invalid demo credentials. Use account: demo, password: demo, id: 0000');
+      }
     });
   }
 

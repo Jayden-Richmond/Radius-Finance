@@ -60,3 +60,25 @@ body{font-family:'Roboto', Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 
 
 /* Prevent background scrolling while modal is open */
 body.modal-open{overflow:hidden}
+
+/* Dashboard styles */
+.dashboard{min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:30px}
+.dashboard-container{width:100%;max-width:420px}
+.balance-card{background:linear-gradient(180deg,var(--brand) 0%, var(--brand-dark) 100%);color:#fff;border-radius:12px;padding:22px 20px;box-shadow:0 8px 26px rgba(11,12,13,0.08)}
+.balance-title{font-size:20px;font-weight:900;letter-spacing:1px;opacity:0.95}
+.balance-amount{font-size:48px;font-weight:900;margin-top:12px}
+
+/* Ensure the dashboard is mobile-friendly */
+@media (max-width:480px){
+  .balance-card{padding:18px}
+  .balance-amount{font-size:40px}
+}
+
+/* Categories & chart styles */
+.categories{margin-top:22px}
+.categories-heading{text-align:center;font-size:18px;font-weight:800;color:#6b6b6b;letter-spacing:1px;margin-bottom:12px}
+.cat-buttons{display:flex;flex-direction:column;gap:12px;align-items:center;margin-bottom:18px}
+.cat-btn{background:var(--brand);color:white;padding:8px 56px;border-radius:6px;border:none;font-weight:700;box-shadow:none;cursor:pointer}
+.cat-btn:active{transform:translateY(1px)}
+
+.chart-removed-note{font-size:14px;color:#666;margin:8px 0 16px;text-align:center}
