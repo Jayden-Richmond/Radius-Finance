@@ -22,6 +22,12 @@ function parseCSV(text){
   return {header, rows};
 }
 
+function formatMoney(value){
+  const n = Number(value);
+  if(isNaN(n)) return '$0.00';
+  return '$' + n.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
 function weekStartISO(dateStr){
   const d = new Date(dateStr);
   const day = d.getDay(); // 0 Sun, 1 Mon
@@ -124,9 +130,9 @@ async function drawChartForUser(userId){
   }
   console.debug('drawChartForUser:', userId);
   try{
-    status.textContent = 'Loading data...';
-    const text = await fetchText('assets/dataset.csv');
-    const {rows} = parseCSV(text);
+  status.textContent = 'Loading data...';
+  const text = await fetchText('assets/dataset.csv');
+  const {header, rows} = parseCSV(text);
     console.debug('rows parsed:', rows ? rows.length : 0);
 
   // Extract all unique purchase types
@@ -138,6 +144,36 @@ async function drawChartForUser(userId){
     const weeks = lastNWeeksEndingAt(6, '2025-06-30');
     const firstRow = rows.find(r => r.id === String(userId));
     const state = firstRow ? firstRow.location : null;
+    // Update account balance from CSV for the user (if present).
+    // Be robust: CSV may store balances with $ or commas. We'll sanitize; if that fails,
+    // fall back to reading the raw CSV line and using the 5th element (index 4).
+    try{
+      const balanceEl = document.getElementById('balance-amount');
+      let balanceValue = NaN;
+      if(firstRow && firstRow.balance !== undefined){
+        const raw = String(firstRow.balance);
+        const cleaned = raw.replace(/[^0-9.-]+/g,'');
+        balanceValue = parseFloat(cleaned);
+      }
+      // fallback: try raw CSV 5th element (index 4)
+      if(Number.isNaN(balanceValue)){
+        const lines = text.split(/\r?\n/).filter(Boolean);
+        // skip header (lines[0]) and search for matching id in column 0
+        for(let i=1;i<lines.length;i++){
+          const parts = lines[i].split(',');
+          if(parts[0] === String(userId)){
+            const candidate = parts[4] || '';
+            const cleaned2 = String(candidate).replace(/[^0-9.-]+/g,'');
+            balanceValue = parseFloat(cleaned2);
+            break;
+          }
+        }
+      }
+      if(!Number.isNaN(balanceValue)){
+        if(balanceEl) balanceEl.textContent = formatMoney(balanceValue);
+        try{ localStorage.setItem('balance', String(balanceValue)); }catch(e){}
+      }
+    }catch(e){/* ignore */}
     if(!state){
       status.textContent = 'User not found in dataset';
       return;
@@ -207,8 +243,8 @@ async function drawChartForUser(userId){
 }
 
 document.addEventListener('DOMContentLoaded', ()=>{
-  const loadBtn = document.getElementById('load-chart');
-  const userInput = document.getElementById('user-id');
+  // Determine current user id from localStorage (set at login). Fallback to '1' for dev.
+  const loggedId = localStorage.getItem('loggedUserId') || '1';
   // Populate welcome message from stored user name
   const welcomeEl = document.getElementById('welcome-msg');
   try{
@@ -231,20 +267,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
       window.location.href = 'index.html';
     });
   }
-  loadBtn.addEventListener('click', ()=>{
-    const id = userInput.value.trim();
-    if(!id){ document.getElementById('chart-status').textContent = 'Enter a user id'; return; }
-    drawChartForUser(id);
-  });
-  // prefill with 1 and load
-  userInput.value = '1';
-  drawChartForUser('1');
+  // Immediately draw chart for the logged-in user
+  drawChartForUser(loggedId);
 
   // Listen for purchase type checkbox changes
   document.getElementById('purchase-type-select').addEventListener('change', ()=>{
-    const id = userInput.value.trim();
-    if(!id) return;
-    drawChartForUser(id);
+    drawChartForUser(loggedId);
   });
 });
 
