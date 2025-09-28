@@ -70,6 +70,13 @@ body.modal-open{overflow:hidden}
 /* Remove the white card container so only the account card is visible */
 .dashboard-card{background:transparent;width:100%;max-width:900px;border-radius:0;padding:0;text-align:center;box-shadow:none;display:flex;flex-direction:column;align-items:center}
 
+/* Welcome message at the top of the dashboard */
+#welcome-msg{width:94%;max-width:760px;text-align:left;font-size:28px;font-weight:700;margin:18px 0;color:#111}
+
+@media (min-width:720px){
+  #welcome-msg{font-size:34px}
+}
+
 /* New account card: large branded rounded rectangle with white text */
 .account-card{width:94%;max-width:760px;background:var(--brand);color:#ffffff;border-radius:14px;padding:28px 30px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;box-shadow:0 6px 18px rgba(178,58,53,0.12)}
 .account-title{font-weight:900;font-size:28px;letter-spacing:1px;margin-bottom:8px;color:rgba(255,255,255,0.95)}
@@ -92,3 +99,8 @@ body.modal-open{overflow:hidden}
 
 /* Small tweak to make logout look secondary */
 .btn{font-family:'Roboto',sans-serif}
+
+/* Dashboard header and logout button */
+.dashboard-header{width:94%;max-width:760px}
+.btn-logout{background:transparent;border:1px solid rgba(0,0,0,0.08);padding:6px 14px;border-radius:8px;font-weight:600;cursor:pointer;min-width:96px;line-height:1;white-space:nowrap}
+.btn-logout:hover{background:rgba(0,0,0,0.04)}

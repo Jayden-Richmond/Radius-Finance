@@ -154,7 +154,7 @@ async function drawChartForUser(userId){
     if(!selectedTypes || selectedTypes.length === 0){
       const zeros = weeks.map(()=>0);
       datasets.push({ label: 'You', data: zeros, borderColor: 'rgba(178,58,53,1)', backgroundColor: 'rgba(178,58,53,0.12)', tension:0.3, fill:true });
-      datasets.push({ label: `${state} avg`, data: zeros, borderColor: 'rgba(80,120,200,1)', backgroundColor: 'rgba(80,120,200,0.12)', tension:0.3, fill:true });
+  datasets.push({ label: `${state} — state average`, data: zeros, borderColor: 'rgba(80,120,200,1)', backgroundColor: 'rgba(80,120,200,0.12)', tension:0.3, fill:true });
     }else{
       // accumulate per-week sums
       const userMap = new Map();
@@ -180,7 +180,7 @@ async function drawChartForUser(userId){
       const userData = mapUserToWeeks(userMap, weeks);
       const stateAvg = computeStateAverageForWeeks(stateUserWeek, state, weeks);
       datasets.push({ label: 'You', data: userData, borderColor: 'rgba(178,58,53,1)', backgroundColor: 'rgba(178,58,53,0.12)', tension:0.3, fill:true });
-      datasets.push({ label: `${state} avg`, data: stateAvg, borderColor: 'rgba(80,120,200,1)', backgroundColor: 'rgba(80,120,200,0.12)', tension:0.3, fill:true });
+  datasets.push({ label: `${state} — state average`, data: stateAvg, borderColor: 'rgba(80,120,200,1)', backgroundColor: 'rgba(80,120,200,0.12)', tension:0.3, fill:true });
     }
     console.debug('datasets count:', datasets.length);
     if(datasets.length === 0){
@@ -209,6 +209,28 @@ async function drawChartForUser(userId){
 document.addEventListener('DOMContentLoaded', ()=>{
   const loadBtn = document.getElementById('load-chart');
   const userInput = document.getElementById('user-id');
+  // Populate welcome message from stored user name
+  const welcomeEl = document.getElementById('welcome-msg');
+  try{
+    const name = localStorage.getItem('loggedUserName') || localStorage.getItem('username') || 'Guest';
+    if(welcomeEl) welcomeEl.textContent = 'Welcome, ' + name;
+  }catch(e){ /* ignore localStorage failures */ }
+  // Wire logout button
+  const logoutBtn = document.getElementById('logout-btn');
+  if(logoutBtn){
+    logoutBtn.addEventListener('click', ()=>{
+      // Clear session/local keys used by the app
+      try{
+        localStorage.removeItem('loggedUserId');
+        localStorage.removeItem('loggedUserName');
+        localStorage.removeItem('balance');
+        // optionally clear persisted dashboard selection
+        // localStorage.removeItem('dashboard.selectedPurchaseTypes');
+      }catch(e){}
+      // Redirect to login page (index.html)
+      window.location.href = 'index.html';
+    });
+  }
   loadBtn.addEventListener('click', ()=>{
     const id = userInput.value.trim();
     if(!id){ document.getElementById('chart-status').textContent = 'Enter a user id'; return; }
