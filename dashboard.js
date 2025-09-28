@@ -283,11 +283,31 @@ async function drawChartForUser(userId){
 
     // Aggregate selected types into summed user and state datasets (one line each)
     const datasets = [];
+    // Visibility persistence: load stored map and capture previous chart visibility
+    const visKey = 'dashboard.datasetVisibility';
+    let storedVis = {};
+    try{ storedVis = JSON.parse(localStorage.getItem(visKey) || '{}'); }catch(e){ storedVis = {}; }
+    const previousVis = {};
+    if(window._dashboardChart && window._dashboardChart.data && Array.isArray(window._dashboardChart.data.datasets)){
+      window._dashboardChart.data.datasets.forEach((d, idx) => {
+        try{
+          const metaId = d.metaId || d.label;
+          const hidden = window._dashboardChart.getDatasetMeta(idx).hidden;
+          previousVis[metaId] = !hidden;
+        }catch(e){}
+      });
+    }
     // If no types selected, show flat zero-slope lines for both You and state avg
     if(!selectedTypes || selectedTypes.length === 0){
       const zeros = weeks.map(()=>0);
-      datasets.push({ label: 'You', data: zeros, borderColor: 'rgba(178,58,53,1)', backgroundColor: 'rgba(178,58,53,0.12)', tension:0.3, fill:true });
-  datasets.push({ label: `${state} — state average`, data: zeros, borderColor: 'rgba(80,120,200,1)', backgroundColor: 'rgba(80,120,200,0.12)', tension:0.3, fill:true });
+      const youMeta = { label: 'You', data: zeros, borderColor: 'rgba(178,58,53,1)', backgroundColor: 'rgba(178,58,53,0.12)', tension:0.3, fill:true, metaId: 'you' };
+      const avgMeta = { label: `${state} — state average`, data: zeros, borderColor: 'rgba(80,120,200,1)', backgroundColor: 'rgba(80,120,200,0.12)', tension:0.3, fill:true, metaId: 'avg' };
+      const youVisible = storedVis.hasOwnProperty('you') ? storedVis['you'] : (previousVis.hasOwnProperty('you') ? previousVis['you'] : true);
+      const avgVisible = storedVis.hasOwnProperty('avg') ? storedVis['avg'] : (previousVis.hasOwnProperty('avg') ? previousVis['avg'] : true);
+      youMeta.hidden = !youVisible;
+      avgMeta.hidden = !avgVisible;
+      datasets.push(youMeta);
+      datasets.push(avgMeta);
     }else{
       // accumulate per-week sums
       const userMap = new Map();
@@ -312,8 +332,14 @@ async function drawChartForUser(userId){
       }
       const userData = mapUserToWeeks(userMap, weeks);
       const stateAvg = computeStateAverageForWeeks(stateUserWeek, state, weeks);
-      datasets.push({ label: 'You', data: userData, borderColor: 'rgba(178,58,53,1)', backgroundColor: 'rgba(178,58,53,0.12)', tension:0.3, fill:true });
-  datasets.push({ label: `${state} — state average`, data: stateAvg, borderColor: 'rgba(80,120,200,1)', backgroundColor: 'rgba(80,120,200,0.12)', tension:0.3, fill:true });
+    const youMeta = { label: 'You', data: userData, borderColor: 'rgba(178,58,53,1)', backgroundColor: 'rgba(178,58,53,0.12)', tension:0.3, fill:true, metaId: 'you' };
+    const avgMeta = { label: `${state} — state average`, data: stateAvg, borderColor: 'rgba(80,120,200,1)', backgroundColor: 'rgba(80,120,200,0.12)', tension:0.3, fill:true, metaId: 'avg' };
+    const youVisible = storedVis.hasOwnProperty('you') ? storedVis['you'] : (previousVis.hasOwnProperty('you') ? previousVis['you'] : true);
+    const avgVisible = storedVis.hasOwnProperty('avg') ? storedVis['avg'] : (previousVis.hasOwnProperty('avg') ? previousVis['avg'] : true);
+    youMeta.hidden = !youVisible;
+    avgMeta.hidden = !avgVisible;
+    datasets.push(youMeta);
+    datasets.push(avgMeta);
 
       // Add faint horizontal region-average lines per selected purchase type using filtered_expenditures.csv
       try{
@@ -359,10 +385,12 @@ async function drawChartForUser(userId){
             }
           }catch(e){ /* if anything fails, fall back to unadjusted value */ }
            const horiz = weeks.map(()=>roundedTotal);
-           const labelBase = matchedCount === 1 ? `${region} avg — ${matchedKeys[0]} (weekly)` : `${region} avg — selected types (weekly)`;
-           const label = adjustedTotal !== roundedTotal ? `${labelBase} — adjusted to your income` : labelBase;
+           const label = `Avg - US ${region}`;
            const horizData = weeks.map(()=>adjustedTotal);
-           datasets.push({ label: label, data: horizData, borderColor: 'rgba(120,120,120,0.28)', borderDash:[6,6], pointRadius:0, fill:false });
+           const regionMeta = { label: label, data: horizData, borderColor: 'rgba(120,120,120,0.28)', borderDash:[6,6], pointRadius:0, fill:false, metaId: 'regionAvg' };
+           const regionVisible = storedVis.hasOwnProperty('regionAvg') ? storedVis['regionAvg'] : (previousVis.hasOwnProperty('regionAvg') ? previousVis['regionAvg'] : true);
+           regionMeta.hidden = !regionVisible;
+           datasets.push(regionMeta);
         }
       }catch(e){
         console.warn('filtered_expenditures.csv not available or failed to parse', e);
@@ -384,7 +412,30 @@ async function drawChartForUser(userId){
         labels: weeks,
         datasets: datasets
       },
-      options: { responsive:true, scales: { y: { beginAtZero:true, title: { display:true, text:'Spending (USD)' } }, x: { title: { display:true, text:'Week starting' } } } }
+      options: {
+        responsive:true,
+        plugins: {
+          legend: {
+            onClick: function(e, legendItem, legend) {
+              const index = legendItem.datasetIndex;
+              const ci = legend.chart;
+              const meta = ci.getDatasetMeta(index);
+              // toggle visibility using Chart.js API
+              meta.hidden = meta.hidden === null ? !ci.data.datasets[index].hidden : !meta.hidden;
+              ci.update();
+              // persist visibility map by metaId (or label)
+              try{
+                const vis = JSON.parse(localStorage.getItem('dashboard.datasetVisibility') || '{}');
+                const ds = ci.data.datasets[index];
+                const key = ds.metaId || ds.label;
+                vis[key] = !meta.hidden;
+                localStorage.setItem('dashboard.datasetVisibility', JSON.stringify(vis));
+              }catch(e){ /* ignore storage errors */ }
+            }
+          }
+        },
+        scales: { y: { beginAtZero:true, title: { display:true, text:'Spending (USD)' } }, x: { title: { display:true, text:'Week starting' } } }
+      }
     });
 
   }catch(err){
