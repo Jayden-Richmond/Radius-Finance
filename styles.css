@@ -76,8 +76,8 @@ body.modal-open{overflow:hidden}
 .account-balance{font-weight:900;font-size:56px;line-height:1;margin-top:6px;color:#fff}
 
 /* Remove any leftover margin from hero title/logo area */
-.logo.pin{display:none}
-.hero-title{display:none}
+.dashboard-page .logo.pin{display:none}
+.dashboard-page .hero-title{display:none}
 
 /* Remove action buttons styling entirely (no buttons on this page) */
 .balance-actions{display:none}
