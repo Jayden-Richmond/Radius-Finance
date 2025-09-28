@@ -24,6 +24,16 @@
           <div id="chart-status" style="color:#666;margin-left:12px"></div>
         </div>
 
+        <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
+          <div style="display:flex;gap:8px;align-items:center">
+            <label for="start-date" style="font-weight:500">Start:</label>
+            <input id="start-date" type="date" aria-label="Chart start date" />
+            <label for="end-date" style="font-weight:500">End:</label>
+            <input id="end-date" type="date" aria-label="Chart end date" />
+            <button type="button" id="reset-range-btn" style="padding:6px 8px;border-radius:6px;border:1px solid rgba(0,0,0,0.08)">Reset range</button>
+          </div>
+        </div>
+
           <div id="purchase-type-select" style="margin-bottom:16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center">
             <span style="font-weight:500;margin-right:8px">Show types:</span>
             <!-- JS will populate checkboxes here -->

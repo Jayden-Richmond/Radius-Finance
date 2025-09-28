@@ -109,6 +109,44 @@ function mapUserToWeeks(userMap, weeks){
   return weeks.map(w => Number((userMap.get(w) || 0).toFixed(2)));
 }
 
+function getRowsDateRange(rows){
+  let min = null, max = null;
+  for(const r of rows){
+    const ds = r.purchase_date;
+    if(!ds) continue;
+    const t = Date.parse(ds);
+    if(Number.isNaN(t)) continue;
+    const iso = new Date(t).toISOString().slice(0,10);
+    if(min === null || iso < min) min = iso;
+    if(max === null || iso > max) max = iso;
+  }
+  return { min, max };
+}
+
+function weeksFromRange(startIso, endIso){
+  // Return array of ISO dates (YYYY-MM-DD) for each Monday between start and end inclusive
+  const start = new Date(startIso + 'T00:00:00');
+  const dayS = start.getDay();
+  const diffS = (dayS === 0 ? -6 : 1 - dayS);
+  const mondayStart = new Date(start);
+  mondayStart.setDate(mondayStart.getDate() + diffS);
+  mondayStart.setHours(0,0,0,0);
+
+  const end = new Date(endIso + 'T00:00:00');
+  const dayE = end.getDay();
+  const diffE = (dayE === 0 ? -6 : 1 - dayE);
+  const mondayEnd = new Date(end);
+  mondayEnd.setDate(mondayEnd.getDate() + diffE);
+  mondayEnd.setHours(0,0,0,0);
+
+  const labels = [];
+  for(let d = new Date(mondayStart); d <= mondayEnd; d.setDate(d.getDate() + 7)){
+    labels.push(d.toISOString().slice(0,10));
+    if(labels.length > 520) break; // safety cap to avoid runaway array
+  }
+  return labels;
+}
+
 async function drawChartForUser(userId){
   const status = document.getElementById('chart-status');
   const canvas = document.getElementById('dashboardChart');
@@ -140,8 +178,67 @@ async function drawChartForUser(userId){
   console.debug('purchaseTypes:', purchaseTypes);
   renderPurchaseTypeCheckboxes(purchaseTypes);
 
-    // Use fixed end date: week of 2025-06-30
-    const weeks = lastNWeeksEndingAt(6, '2025-06-30');
+    // Determine date range from dataset and from user-selected controls.
+    const { min: datasetMin, max: datasetMax } = getRowsDateRange(rows);
+
+    // Wire up date inputs (they exist in dashboard.html). We'll set min/max and default values
+    const startInput = document.getElementById('start-date');
+    const endInput = document.getElementById('end-date');
+    const resetBtn = document.getElementById('reset-range-btn');
+    if(startInput && endInput && datasetMin && datasetMax){
+      startInput.min = datasetMin;
+      startInput.max = datasetMax;
+      endInput.min = datasetMin;
+      endInput.max = datasetMax;
+      // restore saved range if available, otherwise default to full dataset range
+      const savedStart = localStorage.getItem('dashboard.rangeStart');
+      const savedEnd = localStorage.getItem('dashboard.rangeEnd');
+      startInput.value = savedStart || datasetMin;
+      endInput.value = savedEnd || datasetMax;
+
+      // Ensure listeners are added only once: store a flag on the element
+      if(!startInput.dataset.listenerAdded){
+        startInput.addEventListener('change', ()=>{
+          // persist and redraw
+          localStorage.setItem('dashboard.rangeStart', startInput.value);
+          drawChartForUser(userId);
+        });
+        startInput.dataset.listenerAdded = '1';
+      }
+      if(!endInput.dataset.listenerAdded){
+        endInput.addEventListener('change', ()=>{
+          localStorage.setItem('dashboard.rangeEnd', endInput.value);
+          drawChartForUser(userId);
+        });
+        endInput.dataset.listenerAdded = '1';
+      }
+      if(resetBtn && !resetBtn.dataset.listenerAdded){
+        resetBtn.addEventListener('click', ()=>{
+          startInput.value = datasetMin;
+          endInput.value = datasetMax;
+          localStorage.setItem('dashboard.rangeStart', datasetMin);
+          localStorage.setItem('dashboard.rangeEnd', datasetMax);
+          drawChartForUser(userId);
+        });
+        resetBtn.dataset.listenerAdded = '1';
+      }
+    }
+
+    // Decide which weeks to show. Prefer explicit start/end from inputs when available.
+    let weeks = null;
+    if(startInput && endInput && startInput.value && endInput.value){
+      let s = startInput.value;
+      let e = endInput.value;
+      if(s > e){ // swap to make a valid range
+        const tmp = s; s = e; e = tmp;
+      }
+      weeks = weeksFromRange(s, e);
+    }
+    // Fallback: if no valid range, show last 6 weeks ending at dataset max (or today)
+    if(!weeks || weeks.length === 0){
+      if(datasetMax) weeks = lastNWeeksEndingAt(6, datasetMax);
+      else weeks = lastNWeeks(6);
+    }
     const firstRow = rows.find(r => r.id === String(userId));
     const state = firstRow ? firstRow.location : null;
     // Update account balance from CSV for the user (if present).
