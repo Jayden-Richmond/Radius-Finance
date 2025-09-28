@@ -283,17 +283,11 @@ async function drawChartForUser(userId){
 
     // Aggregate selected types into summed user and state datasets (one line each)
     const datasets = [];
-    // load hidden set so we can apply persisted visibility to datasets
-    const hiddenLabels = loadHiddenDatasetLabels();
     // If no types selected, show flat zero-slope lines for both You and state avg
     if(!selectedTypes || selectedTypes.length === 0){
       const zeros = weeks.map(()=>0);
-      const youDs = { label: 'You', data: zeros, borderColor: 'rgba(178,58,53,1)', backgroundColor: 'rgba(178,58,53,0.12)', tension:0.3, fill:true };
-      const stDs = { label: `${state} — state average`, data: zeros, borderColor: 'rgba(80,120,200,1)', backgroundColor: 'rgba(80,120,200,0.12)', tension:0.3, fill:true };
-      if(hiddenLabels.has(youDs.label)) youDs.hidden = true;
-      if(hiddenLabels.has(stDs.label)) stDs.hidden = true;
-      datasets.push(youDs);
-      datasets.push(stDs);
+      datasets.push({ label: 'You', data: zeros, borderColor: 'rgba(178,58,53,1)', backgroundColor: 'rgba(178,58,53,0.12)', tension:0.3, fill:true });
+  datasets.push({ label: `${state} — state average`, data: zeros, borderColor: 'rgba(80,120,200,1)', backgroundColor: 'rgba(80,120,200,0.12)', tension:0.3, fill:true });
     }else{
       // accumulate per-week sums
       const userMap = new Map();
@@ -318,12 +312,8 @@ async function drawChartForUser(userId){
       }
       const userData = mapUserToWeeks(userMap, weeks);
       const stateAvg = computeStateAverageForWeeks(stateUserWeek, state, weeks);
-      const youDs = { label: 'You', data: userData, borderColor: 'rgba(178,58,53,1)', backgroundColor: 'rgba(178,58,53,0.12)', tension:0.3, fill:true };
-      const stDs = { label: `${state} — state average`, data: stateAvg, borderColor: 'rgba(80,120,200,1)', backgroundColor: 'rgba(80,120,200,0.12)', tension:0.3, fill:true };
-      if(hiddenLabels.has(youDs.label)) youDs.hidden = true;
-      if(hiddenLabels.has(stDs.label)) stDs.hidden = true;
-      datasets.push(youDs);
-      datasets.push(stDs);
+      datasets.push({ label: 'You', data: userData, borderColor: 'rgba(178,58,53,1)', backgroundColor: 'rgba(178,58,53,0.12)', tension:0.3, fill:true });
+  datasets.push({ label: `${state} — state average`, data: stateAvg, borderColor: 'rgba(80,120,200,1)', backgroundColor: 'rgba(80,120,200,0.12)', tension:0.3, fill:true });
 
       // Add faint horizontal region-average lines per selected purchase type using filtered_expenditures.csv
       try{
@@ -368,12 +358,11 @@ async function drawChartForUser(userId){
               adjustedTotal = Number((roundedTotal * factor).toFixed(2));
             }
           }catch(e){ /* if anything fails, fall back to unadjusted value */ }
-          // Use a short consistent label as requested
-          const label = 'Average — location & income';
-          const horizData = weeks.map(()=>adjustedTotal);
-          const avgDs = { label: label, data: horizData, borderColor: 'rgba(120,120,120,0.28)', borderDash:[6,6], pointRadius:0, fill:false };
-          if(hiddenLabels.has(avgDs.label)) avgDs.hidden = true;
-          datasets.push(avgDs);
+           const horiz = weeks.map(()=>roundedTotal);
+           const labelBase = matchedCount === 1 ? `${region} avg — ${matchedKeys[0]} (weekly)` : `${region} avg — selected types (weekly)`;
+           const label = adjustedTotal !== roundedTotal ? `${labelBase} — adjusted to your income` : labelBase;
+           const horizData = weeks.map(()=>adjustedTotal);
+           datasets.push({ label: label, data: horizData, borderColor: 'rgba(120,120,120,0.28)', borderDash:[6,6], pointRadius:0, fill:false });
         }
       }catch(e){
         console.warn('filtered_expenditures.csv not available or failed to parse', e);
@@ -388,70 +377,20 @@ async function drawChartForUser(userId){
       return;
     }
     status.textContent = '';
-    // Before creating the chart, make sure all dataset labels have consistent hidden properties
-    // (already set when constructing datasets above).
-    // Ensure previous chart is destroyed to avoid Chart.js "canvas is already in use" errors
-    if(window._dashboardChart){
-      try{ window._dashboardChart.destroy(); }catch(e){ /* ignore */ }
-      window._dashboardChart = null;
-    }
+    if(window._dashboardChart) window._dashboardChart.destroy();
     window._dashboardChart = new Chart(ctx, {
-       type: 'line',
-       data: {
-         labels: weeks,
-         datasets: datasets
-       },
-       options: { responsive:true, scales: { y: { beginAtZero:true, title: { display:true, text:'Spending (USD)' } }, x: { title: { display:true, text:'Week starting' } } } }
+      type: 'line',
+      data: {
+        labels: weeks,
+        datasets: datasets
+      },
+      options: { responsive:true, scales: { y: { beginAtZero:true, title: { display:true, text:'Spending (USD)' } }, x: { title: { display:true, text:'Week starting' } } } }
     });
-    // Attach legend click handler programmatically so we can persist legend-hidden state
-    try{
-      window._dashboardChart.options.plugins = window._dashboardChart.options.plugins || {};
-      window._dashboardChart.options.plugins.legend = window._dashboardChart.options.plugins.legend || {};
-      window._dashboardChart.options.plugins.legend.onClick = legendToggleHandler;
-      window._dashboardChart.update();
-    }catch(e){ /* ignore if plugin attach fails */ }
 
   }catch(err){
     console.error(err);
     status.textContent = 'Failed to load data: ' + err.message;
   }
-}
-
-// Named handler for legend clicks - toggles visibility and persists label state
-function legendToggleHandler(e, legendItem, legend){
-  try{
-    const index = legendItem.datasetIndex;
-    const ci = legend.chart;
-    // Toggle using chart helper so Chart.js internal state stays consistent
-    if(typeof ci.toggleDataVisibility === 'function'){
-      ci.toggleDataVisibility(index);
-    }else{
-      // fallback for older versions
-      const meta = ci.getDatasetMeta(index);
-      meta.hidden = meta.hidden === null ? !ci.data.datasets[index].hidden : !meta.hidden;
-    }
-    ci.update();
-    // Persist the hidden state by dataset label
-    const label = (ci.data.datasets[index] && ci.data.datasets[index].label) ? ci.data.datasets[index].label : legendItem.text;
-    const set = loadHiddenDatasetLabels();
-    const isNowHidden = !(typeof ci.isDatasetVisible === 'function' ? ci.isDatasetVisible(index) : !(ci.getDatasetMeta(index).hidden));
-    if(isNowHidden) set.add(label); else set.delete(label);
-    saveHiddenDatasetLabels(set);
-  }catch(e){ /* ignore */ }
-}
-
-// Helpers to persist which dataset labels the user has hidden via the legend
-function loadHiddenDatasetLabels(){
-  try{
-    const s = localStorage.getItem('dashboard.hiddenDatasets');
-    if(!s) return new Set();
-    const arr = JSON.parse(s);
-    if(!Array.isArray(arr)) return new Set();
-    return new Set(arr);
-  }catch(e){ return new Set(); }
-}
-function saveHiddenDatasetLabels(set){
-  try{ localStorage.setItem('dashboard.hiddenDatasets', JSON.stringify(Array.from(set))); }catch(e){}
 }
 
 document.addEventListener('DOMContentLoaded', ()=>{
