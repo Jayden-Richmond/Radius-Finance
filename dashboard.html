@@ -21,9 +21,6 @@
       <section style="width:100%;max-width:900px;margin:28px auto;">
         <h2 style="margin:8px 0 12px;font-size:20px">Weekly spending (you vs state average)</h2>
         <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
-          <label for="user-id">User id:</label>
-          <input id="user-id" placeholder="Enter user id (e.g., 1)" style="padding:8px;border-radius:6px;border:1px solid rgba(0,0,0,0.08)" />
-          <button id="load-chart" class="btn btn-primary" style="padding:8px 12px">Load</button>
           <div id="chart-status" style="color:#666;margin-left:12px"></div>
         </div>
 
@@ -41,21 +38,5 @@
   <!-- Chart.js CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="dashboard.js"></script>
-  <script>
-    document.addEventListener('DOMContentLoaded', ()=>{
-      const amountEl = document.getElementById('balance-amount');
-
-      function formatMoney(value){
-        const n = Number(value);
-        if(isNaN(n)) return '$0.00';
-        return '$' + n.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
-      }
-
-      // Read stored balance or default to 0.00
-      let balance = localStorage.getItem('balance');
-      if(balance === null) balance = '0.00';
-      amountEl.textContent = formatMoney(balance);
-    });
-  </script>
 </body>
 </html>
