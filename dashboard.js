@@ -281,6 +281,9 @@ async function drawChartForUser(userId){
     if(!selectedTypes) selectedTypes = [];
     console.debug('selectedTypes:', selectedTypes);
 
+  // Render quick statistical summary under the controls
+  try{ renderChartSummary(rows, userId, weeks, selectedTypes, state); }catch(e){ console.warn('Failed to render chart summary', e); }
+
     // Aggregate selected types into summed user and state datasets (one line each)
     const datasets = [];
     // Visibility persistence: load stored map and capture previous chart visibility
@@ -308,6 +311,15 @@ async function drawChartForUser(userId){
       avgMeta.hidden = !avgVisible;
       datasets.push(youMeta);
       datasets.push(avgMeta);
+      // Also add a zero-slope region average line for consistency when no types are selected
+      try{
+        const region = stateToRegion(state) || 'United States';
+        const regionLabel = `Avg - US ${region}`;
+        const regionMeta = { label: regionLabel, data: zeros, borderColor: 'rgba(120,120,120,0.28)', borderDash:[6,6], pointRadius:0, fill:false, metaId: 'regionAvg' };
+        const regionVisible = storedVis.hasOwnProperty('regionAvg') ? storedVis['regionAvg'] : (previousVis.hasOwnProperty('regionAvg') ? previousVis['regionAvg'] : true);
+        regionMeta.hidden = !regionVisible;
+        datasets.push(regionMeta);
+      }catch(e){ /* ignore region add errors */ }
     }else{
       // accumulate per-week sums
       const userMap = new Map();
@@ -574,6 +586,126 @@ function getSelectedPurchaseTypes(){
   const container = document.getElementById('purchase-type-select');
   if(!container) return [];
   return Array.from(container.querySelectorAll('input[type=checkbox]:checked')).map(cb => cb.value);
+}
+
+// Compute simple statistics and render a brief bullet list under the controls
+function renderChartSummary(rows, userId, weeks, selectedTypes, state){
+  const summaryEl = document.getElementById('chart-summary');
+  const listEl = document.getElementById('chart-summary-list');
+  if(!summaryEl || !listEl) return;
+  listEl.innerHTML = '';
+  if(!selectedTypes || selectedTypes.length === 0){
+    summaryEl.style.display = 'none';
+    return;
+  }
+
+  // Compute total spent per month (use selected types if provided, otherwise all types)
+  const typeFilter = (selectedTypes && selectedTypes.length > 0) ? new Set(selectedTypes) : null;
+  const userTotalsMap = new Map(); // week -> total for user
+  const stateUserWeek = new Map(); // userId -> Map(week->sum) for state (reuse name later)
+  for(const r of rows){
+    // skip rows not in selected types when a filter is active
+    if(typeFilter && !typeFilter.has(r.purchase_type)) continue;
+    const week = weekStartISO(r.purchase_date);
+    const amt = Number(r.purchase_amount) || 0;
+    if(r.id === String(userId)){
+      userTotalsMap.set(week, (userTotalsMap.get(week) || 0) + amt);
+    }
+    if(r.location === state){
+      if(!stateUserWeek.has(r.id)) stateUserWeek.set(r.id, new Map());
+      const wm = stateUserWeek.get(r.id);
+      wm.set(week, (wm.get(week) || 0) + amt);
+    }
+  }
+  // Sum across the requested weeks
+  const totalUserWeeks = weeks.reduce((acc,w)=> acc + (userTotalsMap.get(w) || 0), 0);
+  const userMonthly = weeks.length ? (totalUserWeeks / weeks.length) * 4.345 : 0; // 4.345 weeks/month
+  // compute state per-week mean then monthly
+  const perWeekStateMeans = weeks.map(w => {
+    let sum = 0, count = 0;
+    for(const [uid, wm] of stateUserWeek.entries()){
+      sum += (wm.get(w) || 0);
+      count++;
+    }
+    return count === 0 ? 0 : (sum / count);
+  });
+  const avgStatePerWeek = weeks.length ? (perWeekStateMeans.reduce((a,b)=>a+b,0) / weeks.length) : 0;
+  const stateMonthly = avgStatePerWeek * 4.345;
+
+  // Compare using percent difference and 10% threshold
+  function fmtPct(p){
+    if(p === null || !Number.isFinite(p)) return 'N/A';
+    return (p >= 0 ? '+' : '') + p.toFixed(1) + '%';
+  }
+  const totalPct = (stateMonthly === 0) ? null : ((userMonthly - stateMonthly) / stateMonthly) * 100;
+  let totalLabel;
+  if(stateMonthly === 0 && userMonthly === 0) totalLabel = 'No spending in the selected categories for both you and the state.';
+  else if(stateMonthly === 0 && userMonthly > 0) totalLabel = 'You spend in the selected categories while the state average is zero.';
+  else if(userMonthly === 0 && stateMonthly > 0) totalLabel = 'You spend significantly less (zero) than the state average.';
+  else {
+    const absPct = Math.abs(totalPct || 0);
+    if(absPct > 10) totalLabel = (totalPct > 0) ? 'Higher than the state average.' : 'Lower than the state average.';
+    else totalLabel = 'Similar to the state average.';
+  }
+  const totalLi = document.createElement('li');
+  totalLi.style.marginBottom = '8px';
+  const labelText = typeFilter ? 'Total of selected categories per month:' : 'Total (all types) per month:';
+  totalLi.textContent = `${labelText} ${totalLabel} (You: ${formatMoney(userMonthly)}, State: ${formatMoney(stateMonthly)}, ${fmtPct(totalPct)})`;
+  listEl.appendChild(totalLi);
+
+  // For each selected type, compute user's mean weekly spending and state's mean weekly spending
+  for(const type of selectedTypes){
+    // user weekly totals for this type across weeks
+    const userTotals = new Map(); // week -> total
+    const stateUserWeek = new Map(); // userId -> Map(week->sum) for state
+    for(const r of rows){
+      if(r.purchase_type !== type) continue;
+      const week = weekStartISO(r.purchase_date);
+      const amt = Number(r.purchase_amount) || 0;
+      if(r.id === String(userId)){
+        userTotals.set(week, (userTotals.get(week)||0) + amt);
+      }
+      if(r.location === state){
+        if(!stateUserWeek.has(r.id)) stateUserWeek.set(r.id, new Map());
+        const wm = stateUserWeek.get(r.id);
+        wm.set(week, (wm.get(week)||0) + amt);
+      }
+    }
+    // Align to the weeks array: compute mean per-week for user and state
+    const userWeekValues = weeks.map(w => Number((userTotals.get(w) || 0).toFixed(2)));
+    const userMean = userWeekValues.reduce((a,b)=>a+b,0) / (weeks.length || 1);
+
+    // state mean: for each week compute average across users in that state, then average across weeks
+    const perWeekStateMeans = weeks.map(w => {
+      let sum = 0, count = 0;
+      for(const [uid, wm] of stateUserWeek.entries()){
+        sum += (wm.get(w) || 0);
+        count++;
+      }
+      return count === 0 ? 0 : (sum / count);
+    });
+    const stateMean = perWeekStateMeans.reduce((a,b)=>a+b,0) / (weeks.length || 1);
+
+    // Compute percent difference and apply 10% rule
+    const pct = (stateMean === 0) ? null : ((userMean - stateMean) / stateMean) * 100;
+    let rel;
+    if(stateMean === 0 && userMean === 0) rel = 'No spending in this category for both you and the state.';
+    else if(stateMean === 0 && userMean > 0) rel = 'You spend in this category while the state average is zero.';
+    else if(userMean === 0 && stateMean > 0) rel = 'You spend significantly less (zero) than the state average.';
+    else {
+      const absPct = Math.abs(pct || 0);
+      if(absPct > 10) rel = (pct > 0) ? 'Higher than the state average.' : 'Lower than the state average.';
+      else rel = 'Similar to the state average.';
+    }
+
+    // Build bullet point with percent only (no dollar amounts)
+    const li = document.createElement('li');
+    li.style.marginBottom = '6px';
+    li.textContent = `${type}: ${rel} (${fmtPct(pct)})`;
+    listEl.appendChild(li);
+  }
+
+  summaryEl.style.display = 'block';
 }
 
 function parseFilteredExpenditures(text){

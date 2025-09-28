@@ -34,9 +34,15 @@
           </div>
         </div>
 
-          <div id="purchase-type-select" style="margin-bottom:16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+          <div id="purchase-type-select" style="margin-bottom:8px;display:flex;flex-wrap:wrap;gap:10px;align-items:center">
             <span style="font-weight:500;margin-right:8px">Show types:</span>
             <!-- JS will populate checkboxes here -->
+          </div>
+
+          <!-- Statistical summary: populated by dashboard.js -->
+          <div id="chart-summary" aria-live="polite" style="margin:8px 0 16px;padding:10px;background:#fafafa;border-radius:8px;border:1px solid #eee;display:none">
+            <strong style="display:block;margin-bottom:6px">Quick analysis</strong>
+            <ul id="chart-summary-list" style="margin:0;padding-left:18px;color:#333"></ul>
           </div>
 
         <canvas id="dashboardChart" width="800" height="360" aria-label="Weekly spending chart" role="img"></canvas>
